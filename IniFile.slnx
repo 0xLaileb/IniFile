@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/solution items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/IniFile.Example/IniFile.Example.csproj" Id="b639f34d-b20a-48fa-b5a2-1e42a5d978b2" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IniFile.Tests/IniFile.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/IniFile/IniFile.csproj" />
+  </Folder>
+</Solution>
