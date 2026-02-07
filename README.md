@@ -2,7 +2,7 @@
   <img src="resources/logo.png?raw=true" alt="IniFile Logo" width="140" />
 </p>
 
-<h1 align="center">🗂️ IniFile</h1>
+<h1 align="center">💾 IniFile</h1>
 
 <p align="center">
   <b>A lightweight .NET library for reading and writing Windows INI files via the native kernel32 API.</b>
