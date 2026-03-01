@@ -242,3 +242,13 @@ Contributions are welcome! To get started:
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## 📖 Star History
+
+<a href="https://www.star-history.com/#0xLaileb/IniFile&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date" />
+ </picture>
+</a>
