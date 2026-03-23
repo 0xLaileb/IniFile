@@ -57,7 +57,7 @@ It lets you read and write classic **INI configuration files** with a simple, st
 | `GetAllDataSection` | 📋 List all `key=value` pairs in a section |
 | `DeleteKey` | 🗑️ Remove a specific key from a section |
 | `DeleteSection` | 🧹 Remove an entire section and its keys |
-| `KeyExists` | 🔍 Check whether a key has a non-empty value |
+| `KeyExists` | 🔍 Check whether a key exists in a section |
 
 ---
 
@@ -189,7 +189,7 @@ Removes an entire section. Returns `true` on success.
 ```csharp
 public bool KeyExists(string key, string? section = null)
 ```
-Returns `true` if the key exists and has a non-empty value.
+Returns `true` if the key exists in the section (including keys with empty values).
 
 ---
 

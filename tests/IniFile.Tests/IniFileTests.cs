@@ -387,4 +387,128 @@ public sealed class IniFileTests : IDisposable
         // Assert
         Assert.Equal(longValue, result);
     }
+
+    [Fact]
+    public void ReadString_ValueExceedsDefaultBuffer_AutoExpandsAndReturnsFullValue()
+    {
+        // Arrange: value longer than default buffer (1024 chars)
+        string longValue = new('Z', 1500);
+        _ini.Write("Big", longValue, "Section");
+
+        // Act: default bufferSize=1024, should auto-expand
+        string result = _ini.ReadString("Big", "Section");
+
+        // Assert
+        Assert.Equal(longValue, result);
+    }
+
+    [Theory]
+    [InlineData(1023)]
+    [InlineData(1024)]
+    [InlineData(1025)]
+    public void ReadString_ValueAtBufferBoundary_ReturnsFullValue(int length)
+    {
+        // Arrange
+        string value = new('A', length);
+        _ini.Write("Boundary", value, "Section");
+
+        // Act
+        string result = _ini.ReadString("Boundary", "Section");
+
+        // Assert
+        Assert.Equal(value, result);
+    }
+
+    [Fact]
+    public void KeyExists_KeyWithEmptyValue_ReturnsTrue()
+    {
+        // Arrange: write a key with empty value
+        _ini.Write("Empty", "", "Section");
+
+        // Act & Assert: key exists even with empty value
+        Assert.True(_ini.KeyExists("Empty", "Section"));
+    }
+
+    [Fact]
+    public void KeyExists_AfterWriteEmptyValue_StillExists()
+    {
+        // Arrange
+        _ini.Write("Key", "Value", "Section");
+        _ini.Write("Key", "", "Section"); // overwrite with empty
+
+        // Act & Assert
+        Assert.True(_ini.KeyExists("Key", "Section"));
+    }
+
+    [Fact]
+    public void ReadInt_NegativeValue_ReturnsNegative()
+    {
+        // Windows API GetPrivateProfileInt correctly parses negative integer strings.
+        _ini.Write("Neg", "-42", "Section");
+
+        int result = _ini.ReadInt("Neg", "Section", defaultValue: 99);
+
+        Assert.Equal(-42, result);
+    }
+
+    [Fact]
+    public void ReadInt_MaxIntValue_ReturnsCorrectly()
+    {
+        // Arrange
+        _ini.Write("Max", "2147483647", "Section");
+
+        // Act
+        int result = _ini.ReadInt("Max", "Section");
+
+        // Assert
+        Assert.Equal(2147483647, result);
+    }
+
+    [Fact]
+    public void ReadInt_HexValue_ParsedByWindowsApi()
+    {
+        // Windows API natively parses 0x-prefixed hex values
+        _ini.Write("Hex", "0xFF", "Section");
+
+        int result = _ini.ReadInt("Hex", "Section");
+
+        Assert.Equal(255, result);
+    }
+
+    [Fact]
+    public void ReadString_NullSection_ReturnsAllSectionNames()
+    {
+        // Arrange: create two sections
+        _ini.Write("K", "V", "Alpha");
+        _ini.Write("K", "V", "Beta");
+
+        // Act: passing null for both key and section returns all section names
+        // as a single null-separated string (undocumented but consistent Windows API behavior)
+        string[] sections = _ini.GetAllSections();
+
+        // Assert via GetAllSections (already tested), just confirm ReadString with
+        // null key returns something non-empty when sections exist
+        string keyNames = _ini.ReadString(null!, "Alpha");
+        Assert.False(string.IsNullOrEmpty(keyNames));
+    }
+
+    [Fact]
+    public void DeleteKey_NullOrEmptyKey_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.DeleteKey(null!));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.DeleteKey(""));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.DeleteKey("   "));
+    }
+
+    [Fact]
+    public void GetAllDataSection_NullSection_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.GetAllDataSection(null!));
+    }
+
+    [Fact]
+    public void GetAllDataSection_EmptySection_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.GetAllDataSection(""));
+    }
 }

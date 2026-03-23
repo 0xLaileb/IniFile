@@ -88,7 +88,7 @@ public sealed partial class IniFile
     [LibraryImport("kernel32", EntryPoint = "GetPrivateProfileIntW",
         StringMarshalling = StringMarshalling.Utf16)]
     private static partial int NativeGetPrivateProfileInt(
-        string lpAppName,
+        string? lpAppName,
         string lpKeyName,
         int nDefault,
         string lpFileName);
@@ -150,8 +150,8 @@ public sealed partial class IniFile
     /// The value returned when the key is not found. Defaults to an empty string.
     /// </param>
     /// <param name="bufferSize">
-    /// The size of the internal read buffer in characters. Defaults to <see cref="DefaultBufferSize"/>.
-    /// Increase this if you expect very long values.
+    /// The initial size of the internal read buffer in characters. Defaults to <see cref="DefaultBufferSize"/>.
+    /// The buffer doubles automatically if the value exceeds it, up to <see cref="MaxSectionBufferSize"/>.
     /// </param>
     /// <returns>
     /// The value associated with the key, or <paramref name="defaultValue"/> if the key was not found.
@@ -159,10 +159,20 @@ public sealed partial class IniFile
     public string ReadString(string key, string? section = null,
         string defaultValue = "", int bufferSize = DefaultBufferSize)
     {
-        char[] buffer = new char[bufferSize];
-        int length = NativeGetPrivateProfileString(section, key, defaultValue, buffer, bufferSize, _filePath);
+        while (true)
+        {
+            char[] buffer = new char[bufferSize];
+            int length = NativeGetPrivateProfileString(section, key, defaultValue, buffer, bufferSize, _filePath);
 
-        return new string(buffer, 0, length);
+            // If length == bufferSize - 1, the buffer was too small and the value was truncated.
+            if (length == bufferSize - 1 && bufferSize < MaxSectionBufferSize)
+            {
+                bufferSize = Math.Min(bufferSize * 2, MaxSectionBufferSize);
+                continue;
+            }
+
+            return new string(buffer, 0, length);
+        }
     }
 
     /// <summary>
@@ -180,7 +190,7 @@ public sealed partial class IniFile
     /// characters (e.g. <c>"10apples"</c>), only the leading numeric portion is returned (<c>10</c>).
     /// </returns>
     public int ReadInt(string key, string? section = null, int defaultValue = -1)
-        => NativeGetPrivateProfileInt(section ?? string.Empty, key, defaultValue, _filePath);
+        => NativeGetPrivateProfileInt(section, key, defaultValue, _filePath);
 
     /// <summary>
     /// Reads a boolean value from the specified key in the given section of the INI file.
@@ -223,8 +233,16 @@ public sealed partial class IniFile
     /// An array of strings in <c>"key=value"</c> format for each entry in the section.
     /// Returns an empty array if the section does not exist or contains no keys.
     /// </returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="section"/> is <c>null</c>, empty, or whitespace.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the section data exceeds the maximum supported buffer size.
+    /// </exception>
     public string[] GetAllDataSection(string section, int bufferSize = MaxSectionBufferSize)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(section);
+
         nint pMem = Marshal.AllocHGlobal(bufferSize * sizeof(char));
         try
         {
@@ -233,6 +251,13 @@ public sealed partial class IniFile
             if (count <= 0)
             {
                 return [];
+            }
+
+            // If count == bufferSize - 2, the buffer was too small and data was truncated.
+            if (count >= bufferSize - 2)
+            {
+                throw new InvalidOperationException(
+                    $"Section '{section}' data exceeds the maximum buffer size of {bufferSize} characters.");
             }
 
             string raw = Marshal.PtrToStringUni(pMem, count)!;
@@ -253,6 +278,9 @@ public sealed partial class IniFile
     /// <returns>
     /// An array of section names. Returns an empty array if the file has no sections.
     /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the total section names data exceeds the maximum supported buffer size.
+    /// </exception>
     public string[] GetAllSections(int bufferSize = MaxSectionBufferSize)
     {
         nint pMem = Marshal.AllocHGlobal(bufferSize * sizeof(char));
@@ -263,6 +291,13 @@ public sealed partial class IniFile
             if (count <= 0)
             {
                 return [];
+            }
+
+            // If count == bufferSize - 2, the buffer was too small and data was truncated.
+            if (count >= bufferSize - 2)
+            {
+                throw new InvalidOperationException(
+                    $"Section names data exceeds the maximum buffer size of {bufferSize} characters.");
             }
 
             string raw = Marshal.PtrToStringUni(pMem, count)!;
@@ -280,8 +315,14 @@ public sealed partial class IniFile
     /// <param name="key">The key name to delete.</param>
     /// <param name="section">The section containing the key.</param>
     /// <returns><c>true</c> if the operation succeeded; otherwise <c>false</c>.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
+    /// </exception>
     public bool DeleteKey(string key, string? section = null)
-        => NativeWritePrivateProfileString(section, key, null, _filePath);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return NativeWritePrivateProfileString(section, key, null, _filePath);
+    }
 
     /// <summary>
     /// Deletes the specified section and all of its keys from the INI file.
@@ -292,16 +333,24 @@ public sealed partial class IniFile
         => NativeWritePrivateProfileString(section, null, null, _filePath);
 
     /// <summary>
-    /// Checks whether the specified key exists and has a non-empty value
-    /// in the given section of the INI file.
+    /// Checks whether the specified key exists in the given section of the INI file.
     /// </summary>
     /// <param name="key">The key name to check.</param>
     /// <param name="section">The section containing the key.</param>
     /// <returns>
-    /// <c>true</c> if the key exists and its value is not empty; otherwise <c>false</c>.
+    /// <c>true</c> if the key exists (even if its value is empty); otherwise <c>false</c>.
     /// </returns>
     public bool KeyExists(string key, string? section = null)
-        => ReadString(key, section).Length > 0;
+    {
+        char[] buffer = new char[MaxSectionBufferSize];
+        // Passing null for lpKeyName returns all key names in the section separated by \0.
+        int length = NativeGetPrivateProfileString(section, null, null, buffer, MaxSectionBufferSize, _filePath);
+        if (length <= 0) return false;
+
+        string raw = new string(buffer, 0, length);
+        string[] keys = raw.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        return Array.Exists(keys, k => string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+    }
 
     #endregion
 }
