@@ -1,22 +1,16 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/0xLaileb/IniFile/master/resources/logo.png" alt="IniFile Logo" width="140" />
-</p>
+![IniFile Logo](https://raw.githubusercontent.com/0xLaileb/IniFile/master/resources/logo.png)
 
-<h1 align="center">💾 IniFile</h1>
+# 💾 IniFile
 
-<p align="center">
-  <b>A lightweight .NET library for reading and writing Windows INI files via the native kernel32 API.</b>
-</p>
+**A lightweight .NET library for reading and writing Windows INI files via the native kernel32 API.**
 
-<p align="center">
-  <a href="https://github.com/0xLaileb/IniFile/releases"><img src="https://img.shields.io/github/v/release/0xLaileb/IniFile?color=%231DC8EE&label=Release&style=flat-square" alt="Release" /></a>
-  <a href="https://www.nuget.org/packages/Laileb.IniFile"><img src="https://img.shields.io/nuget/v/Laileb.IniFile?color=%231DC8EE&label=NuGet&style=flat-square&logo=nuget" alt="NuGet" /></a>
-  <a href="https://www.nuget.org/packages/Laileb.IniFile"><img src="https://img.shields.io/nuget/dt/Laileb.IniFile?color=%231DC8EE&label=Downloads&style=flat-square&logo=nuget" alt="NuGet Downloads" /></a>
-  <a href="https://github.com/0xLaileb/IniFile/commits"><img src="https://img.shields.io/github/last-commit/0xLaileb/IniFile?color=%231DC8EE&label=Last%20Commit&style=flat-square" alt="Last Commit" /></a>
-  <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 10" />
-  <img src="https://img.shields.io/badge/Platform-Windows-0078D4?style=flat-square&logo=windows" alt="Windows" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
-</p>
+[![Release](https://img.shields.io/github/v/release/0xLaileb/IniFile?color=%231DC8EE&label=Release&style=flat-square)](https://github.com/0xLaileb/IniFile/releases)
+[![NuGet](https://img.shields.io/nuget/v/Laileb.IniFile?color=%231DC8EE&label=NuGet&style=flat-square&logo=nuget)](https://www.nuget.org/packages/Laileb.IniFile)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Laileb.IniFile?color=%231DC8EE&label=Downloads&style=flat-square&logo=nuget)](https://www.nuget.org/packages/Laileb.IniFile)
+[![Last Commit](https://img.shields.io/github/last-commit/0xLaileb/IniFile?color=%231DC8EE&label=Last%20Commit&style=flat-square)](https://github.com/0xLaileb/IniFile/commits)
+![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet)
+![Windows](https://img.shields.io/badge/Platform-Windows-0078D4?style=flat-square&logo=windows)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 ---
 
@@ -87,7 +81,7 @@ Install-Package Laileb.IniFile
 Or add directly to your `.csproj`:
 
 ```xml
-<PackageReference Include="Laileb.IniFile" Version="2.0.1" />
+<PackageReference Include="Laileb.IniFile" Version="2.0.2" />
 ```
 
 > 💡 Make sure to enable `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` in your `.csproj` (required by `LibraryImport` source generation).
@@ -249,7 +243,3 @@ Contributions are welcome! To get started:
 ## 📄 License
 
 This project is licensed under the [MIT License](https://github.com/0xLaileb/IniFile/blob/master/LICENSE).
-
-## 📖 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date)](https://www.star-history.com/#0xLaileb/IniFile&Date)
