@@ -1,7 +1,17 @@
 <Project>
-	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
-		<!-- This example is Windows-only (kernel32 P/Invoke) -->
-		<NoWarn>$(NoWarn);CA1416</NoWarn>
-	</PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Windows-only P/Invoke, suppress platform compat warning -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- Shared across all projects in the solution -->
+    <Authors>Daniil Laileb</Authors>
+    <Copyright>Copyright (c) 2026 Daniil Laileb</Copyright>
+    <Company>Daniil Laileb</Company>
+
+    <!-- Reproducible builds -->
+    <Deterministic>true</Deterministic>
+    <!-- Required by SourceLink to embed correct source paths in CI -->
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
 </Project>

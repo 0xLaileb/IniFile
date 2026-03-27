@@ -4,6 +4,53 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Package Identity -->
+    <PackageId>Laileb.IniFile</PackageId>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+
+    <!-- Description -->
+    <Title>IniFile — Windows INI File Wrapper</Title>
+    <Description>A lightweight, zero-dependency C# wrapper around the Windows kernel32.dll Private Profile API (WritePrivateProfileString, GetPrivateProfileString, etc.). Provides a strongly-typed interface for reading and writing classic INI configuration files on Windows.</Description>
+    <PackageTags>ini;config;configuration;windows;kernel32;pinvoke;inifile</PackageTags>
+
+    <!-- License &amp; URLs -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/0xLaileb/IniFile</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/0xLaileb/IniFile</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>https://github.com/0xLaileb/IniFile/releases/tag/v2.0.0</PackageReleaseNotes>
+
+    <!-- Icon &amp; README (embedded in .nupkg) -->
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- XML documentation (for IntelliSense in consumer projects) -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Symbol package (.snupkg) for step-through debugging -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- SourceLink -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+    <!-- Catches accidental public API removals between versions -->
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
+
+  <!-- Embed icon and README inside the .nupkg -->
+  <ItemGroup>
+    <None Include="..\..\resources\logo.png" Pack="true" PackagePath="icon.png" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
+  <!-- SourceLink (build-time only, not a consumer dependency) -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
 
 </Project>
