@@ -3,7 +3,7 @@ name: .NET
 on:
   push:
     branches: ["master"]
-    tags: ["v*"]
+    tags: ["v*", "[0-9]*"]
   pull_request:
     branches: ["master"]
 
@@ -80,7 +80,7 @@ jobs:
   publish:
     runs-on: windows-latest
     needs: pack
-    if: startsWith(github.ref, 'refs/tags/v')  # Only on version tags
+    if: startsWith(github.ref, 'refs/tags/')  # Only on version tags
     environment: publish                         # Optional: manual approval gate
 
     steps:
