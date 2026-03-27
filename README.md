@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/logo.png?raw=true" alt="IniFile Logo" width="140" />
+  <img src="https://raw.githubusercontent.com/0xLaileb/IniFile/master/resources/logo.png" alt="IniFile Logo" width="140" />
 </p>
 
 <h1 align="center">💾 IniFile</h1>
@@ -10,7 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/0xLaileb/IniFile/releases"><img src="https://img.shields.io/github/v/release/0xLaileb/IniFile?color=%231DC8EE&label=Release&style=flat-square" alt="Release" /></a>
-  <a href="https://github.com/0xLaileb/IniFile/releases"><img src="https://img.shields.io/github/downloads/0xLaileb/IniFile/total?color=%231DC8EE&label=Downloads&logo=github&style=flat-square" alt="Downloads" /></a>
+  <a href="https://www.nuget.org/packages/Laileb.IniFile"><img src="https://img.shields.io/nuget/v/Laileb.IniFile?color=%231DC8EE&label=NuGet&style=flat-square&logo=nuget" alt="NuGet" /></a>
+  <a href="https://www.nuget.org/packages/Laileb.IniFile"><img src="https://img.shields.io/nuget/dt/Laileb.IniFile?color=%231DC8EE&label=Downloads&style=flat-square&logo=nuget" alt="NuGet Downloads" /></a>
   <a href="https://github.com/0xLaileb/IniFile/commits"><img src="https://img.shields.io/github/last-commit/0xLaileb/IniFile?color=%231DC8EE&label=Last%20Commit&style=flat-square" alt="Last Commit" /></a>
   <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 10" />
   <img src="https://img.shields.io/badge/Platform-Windows-0078D4?style=flat-square&logo=windows" alt="Windows" />
@@ -71,17 +72,23 @@ It lets you read and write classic **INI configuration files** with a simple, st
 
 ### 📦 Installation
 
-#### Option 1 — Project Reference
+#### NuGet Package Manager
 
-Clone the repository and add a project reference:
-
-```xml
-<ProjectReference Include="path\to\src\IniFile\IniFile.csproj" />
+```
+dotnet add package Laileb.IniFile
 ```
 
-#### Option 2 — Copy the Source File
+Or via the Package Manager Console in Visual Studio:
 
-Copy [`src/IniFile/IniFile.cs`](src/IniFile/IniFile.cs) directly into your project.
+```
+Install-Package Laileb.IniFile
+```
+
+Or add directly to your `.csproj`:
+
+```xml
+<PackageReference Include="Laileb.IniFile" Version="2.0.0" />
+```
 
 > 💡 Make sure to enable `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` in your `.csproj` (required by `LibraryImport` source generation).
 
@@ -115,7 +122,7 @@ ini.DeleteKey("Host", "Database");
 ini.DeleteSection("Logging");
 ```
 
-👉 See the full working demo in [`examples/IniFile.Example/Program.cs`](examples/IniFile.Example/Program.cs).
+👉 See the full working demo in [`examples/IniFile.Example/Program.cs`](https://github.com/0xLaileb/IniFile/blob/master/examples/IniFile.Example/Program.cs).
 
 ---
 
@@ -199,7 +206,7 @@ Returns `true` if the key exists in the section (including keys with empty value
 dotnet test
 ```
 
-Tests are located in [`tests/IniFile.Tests/`](tests/IniFile.Tests/) and use **xUnit**. They create temporary INI files in the system temp directory and clean up after each run.
+Tests are located in [`tests/IniFile.Tests/`](https://github.com/0xLaileb/IniFile/tree/master/tests/IniFile.Tests) and use **xUnit**. They create temporary INI files in the system temp directory and clean up after each run.
 
 ---
 
@@ -241,14 +248,8 @@ Contributions are welcome! To get started:
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](https://github.com/0xLaileb/IniFile/blob/master/LICENSE).
 
 ## 📖 Star History
 
-<a href="https://www.star-history.com/#0xLaileb/IniFile&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=0xLaileb/IniFile&type=Date)](https://www.star-history.com/#0xLaileb/IniFile&Date)
