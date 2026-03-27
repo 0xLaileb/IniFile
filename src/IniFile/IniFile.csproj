@@ -44,7 +44,7 @@
 
   <!-- Embed icon and README inside the .nupkg -->
   <ItemGroup>
-    <None Include="..\..\resources\logo.png" Pack="true" PackagePath="icon.png" />
+    <None Include="..\..\resources\icon.png" Pack="true" PackagePath="icon.png" />
     <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 
