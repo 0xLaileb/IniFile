@@ -1,5 +1,3 @@
-![IniFile Logo](https://raw.githubusercontent.com/0xLaileb/IniFile/master/resources/logo.png)
-
 # 💾 IniFile
 
 **A lightweight .NET library for reading and writing Windows INI files via the native kernel32 API.**
@@ -81,7 +79,7 @@ Install-Package Laileb.IniFile
 Or add directly to your `.csproj`:
 
 ```xml
-<PackageReference Include="Laileb.IniFile" Version="2.0.2" />
+<PackageReference Include="Laileb.IniFile" Version="2.0.3" />
 ```
 
 > 💡 Make sure to enable `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` in your `.csproj` (required by `LibraryImport` source generation).
