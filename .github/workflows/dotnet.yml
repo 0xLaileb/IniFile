@@ -57,6 +57,17 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore IniFile.slnx
 
+      - name: Validate package version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content src/IniFile/IniFile.csproj
+          $packageVersion = [string]$project.Project.PropertyGroup.Version
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($packageVersion -ne $tagVersion) {
+            throw "Package version '$packageVersion' does not match tag '$env:GITHUB_REF_NAME'."
+          }
+
       - name: Pack
         run: dotnet pack src/IniFile/IniFile.csproj --no-restore --configuration Release --output ./nupkg
 

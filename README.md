@@ -140,25 +140,25 @@ Creates a new instance bound to the given file path. The path is resolved to an 
 ```csharp
 public bool Write(string key, string? value, string? section = null)
 ```
-Writes a string value. Returns `true` on success. Creates the file, section, and key if they don't exist.
+Writes a string value. Returns `true` on success. Creates the file, section, and key if they don't exist. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### 📖 `ReadString`
 ```csharp
-public string ReadString(string key, string? section = null, string defaultValue = "", int bufferSize = 1024)
+public string ReadString(string? key, string? section = null, string defaultValue = "", int bufferSize = 1024)
 ```
-Returns the value for the key, or `defaultValue` if not found.
+Returns the value for the key, or `defaultValue` if not found. When `section` is omitted or `null`, key reads use an empty section name, which Windows serializes as `[]`. Passing `null` for `key` preserves the native enumeration behavior: key names for a section, or section names when both `key` and `section` are `null`.
 
 #### 🔢 `ReadInt`
 ```csharp
 public int ReadInt(string key, string? section = null, int defaultValue = -1)
 ```
-Returns the integer value for the key, or `defaultValue` if not found or not a valid integer.
+Returns the integer value for the key, or `defaultValue` if the key is not found. Malformed numeric values follow the native `GetPrivateProfileInt` parsing behavior and may return `0` instead of `defaultValue`. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### ✅ `ReadBool`
 ```csharp
 public bool ReadBool(string key, string? section = null, bool defaultValue = false)
 ```
-Returns `true` for `"true"`, `"1"`, `"yes"`; `false` for `"false"`, `"0"`, `"no"` (case-insensitive). Returns `defaultValue` for anything else.
+Returns `true` for `"true"`, `"1"`, `"yes"`; `false` for `"false"`, `"0"`, `"no"` (case-insensitive). Returns `defaultValue` for anything else. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### 📂 `GetAllSections`
 ```csharp
@@ -176,19 +176,19 @@ Returns an array of `"key=value"` strings for every entry in the given section.
 ```csharp
 public bool DeleteKey(string key, string? section = null)
 ```
-Removes a key and its value. Returns `true` on success.
+Removes a key and its value. Returns `true` on success. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### 🧹 `DeleteSection`
 ```csharp
 public bool DeleteSection(string? section = null)
 ```
-Removes an entire section. Returns `true` on success.
+Removes an entire section. Returns `true` on success. When `section` is omitted or `null`, the wrapper deletes the empty `[]` section.
 
 #### 🔍 `KeyExists`
 ```csharp
 public bool KeyExists(string key, string? section = null)
 ```
-Returns `true` if the key exists in the section (including keys with empty values).
+Returns `true` if the key exists in the section (including keys with empty values). When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 ---
 

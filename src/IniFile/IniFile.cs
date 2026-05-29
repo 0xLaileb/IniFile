@@ -30,6 +30,19 @@ public sealed partial class IniFile
     /// <summary>The fully-qualified path to the INI file.</summary>
     private readonly string _filePath;
 
+    private static string NormalizeSection(string? section) => section ?? string.Empty;
+
+    private static void ValidateBufferSize(int bufferSize, int minimumSize = 2)
+    {
+        if (bufferSize < minimumSize || bufferSize > MaxSectionBufferSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(bufferSize),
+                bufferSize,
+                $"Buffer size must be between {minimumSize} and {MaxSectionBufferSize} characters.");
+        }
+    }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="IniFile"/> class
     /// bound to the specified file path.
@@ -83,7 +96,7 @@ public sealed partial class IniFile
 
     /// <summary>
     /// Retrieves an integer value from an INI file.
-    /// If the key is not found or the value is not a valid integer, <paramref name="nDefault"/> is returned.
+    /// If the key is not found, <paramref name="nDefault"/> is returned.
     /// </summary>
     [LibraryImport("kernel32", EntryPoint = "GetPrivateProfileIntW",
         StringMarshalling = StringMarshalling.Utf16)]
@@ -130,21 +143,29 @@ public sealed partial class IniFile
     /// <param name="key">The key name.</param>
     /// <param name="value">The string value to write.</param>
     /// <param name="section">
-    /// The section name. Pass <c>null</c> to target the unnamed (global) area of the file.
+    /// The section name. Pass <c>null</c> to target the empty section name, which Windows serializes as <c>[]</c>.
     /// </param>
     /// <returns><c>true</c> if the write succeeded; otherwise <c>false</c>.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
+    /// </exception>
     public bool Write(string key, string? value, string? section = null)
-        => NativeWritePrivateProfileString(section, key, value, _filePath);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return NativeWritePrivateProfileString(NormalizeSection(section), key, value, _filePath);
+    }
 
     /// <summary>
     /// Reads a string value from the specified key in the given section of the INI file.
     /// </summary>
     /// <param name="key">
     /// The key name. If <c>null</c>, all key names in <paramref name="section"/> are returned
-    /// as a single null-separated string.
+    /// as a single null-separated string. If both <paramref name="key"/> and
+    /// <paramref name="section"/> are <c>null</c>, all section names are returned.
     /// </param>
     /// <param name="section">
-    /// The section name. If <c>null</c>, all section names in the file are returned.
+    /// The section name. When <paramref name="key"/> is not <c>null</c>, pass <c>null</c>
+    /// to target the empty section name, which Windows serializes as <c>[]</c>.
     /// </param>
     /// <param name="defaultValue">
     /// The value returned when the key is not found. Defaults to an empty string.
@@ -152,23 +173,35 @@ public sealed partial class IniFile
     /// <param name="bufferSize">
     /// The initial size of the internal read buffer in characters. Defaults to <see cref="DefaultBufferSize"/>.
     /// The buffer doubles automatically if the value exceeds it, up to <see cref="MaxSectionBufferSize"/>.
+    /// For native key/section enumeration, the buffer must be at least 3 characters.
     /// </param>
     /// <returns>
     /// The value associated with the key, or <paramref name="defaultValue"/> if the key was not found.
     /// </returns>
-    public string ReadString(string key, string? section = null,
+    public string ReadString(string? key, string? section = null,
         string defaultValue = "", int bufferSize = DefaultBufferSize)
     {
+        ValidateBufferSize(bufferSize, key is null ? 3 : 2);
+
+        string? nativeSection = key is null ? section : NormalizeSection(section);
+
         while (true)
         {
             char[] buffer = new char[bufferSize];
-            int length = NativeGetPrivateProfileString(section, key, defaultValue, buffer, bufferSize, _filePath);
+            int length = NativeGetPrivateProfileString(nativeSection, key, defaultValue, buffer, bufferSize, _filePath);
+            int truncationLength = key is null ? bufferSize - 2 : bufferSize - 1;
 
-            // If length == bufferSize - 1, the buffer was too small and the value was truncated.
-            if (length == bufferSize - 1 && bufferSize < MaxSectionBufferSize)
+            // String reads signal truncation at nSize - 1; enumeration reads signal it at nSize - 2.
+            if (length >= truncationLength && bufferSize < MaxSectionBufferSize)
             {
                 bufferSize = Math.Min(bufferSize * 2, MaxSectionBufferSize);
                 continue;
+            }
+
+            if (key is null && length >= truncationLength)
+            {
+                throw new InvalidOperationException(
+                    $"INI data exceeds the maximum buffer size of {MaxSectionBufferSize} characters.");
             }
 
             return new string(buffer, 0, length);
@@ -179,24 +212,29 @@ public sealed partial class IniFile
     /// Reads an integer value from the specified key in the given section of the INI file.
     /// </summary>
     /// <param name="key">The key name.</param>
-    /// <param name="section">The section name.</param>
+    /// <param name="section">The section name, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <param name="defaultValue">
-    /// The value returned when the key is not found or its value is not a valid integer.
-    /// Defaults to <c>-1</c>.
+    /// The value returned when the key is not found. Defaults to <c>-1</c>.
     /// </param>
     /// <returns>
-    /// The integer value of the key, or <paramref name="defaultValue"/> if the key was not found
-    /// or could not be parsed. If the stored value starts with digits followed by non-digit
-    /// characters (e.g. <c>"10apples"</c>), only the leading numeric portion is returned (<c>10</c>).
+    /// The integer value of the key, or <paramref name="defaultValue"/> if the key was not found.
+    /// Malformed numeric values follow the native <c>GetPrivateProfileInt</c> parsing behavior
+    /// and may return <c>0</c> instead of <paramref name="defaultValue"/>.
     /// </returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
+    /// </exception>
     public int ReadInt(string key, string? section = null, int defaultValue = -1)
-        => NativeGetPrivateProfileInt(section, key, defaultValue, _filePath);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return NativeGetPrivateProfileInt(NormalizeSection(section), key, defaultValue, _filePath);
+    }
 
     /// <summary>
     /// Reads a boolean value from the specified key in the given section of the INI file.
     /// </summary>
     /// <param name="key">The key name.</param>
-    /// <param name="section">The section name.</param>
+    /// <param name="section">The section name, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <param name="defaultValue">
     /// The value returned when the key is not found or cannot be parsed. Defaults to <c>false</c>.
     /// </param>
@@ -207,6 +245,7 @@ public sealed partial class IniFile
     /// </returns>
     public bool ReadBool(string key, string? section = null, bool defaultValue = false)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         string value = ReadString(key, section);
 
         if (string.IsNullOrWhiteSpace(value))
@@ -242,6 +281,7 @@ public sealed partial class IniFile
     public string[] GetAllDataSection(string section, int bufferSize = MaxSectionBufferSize)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(section);
+        ValidateBufferSize(bufferSize);
 
         nint pMem = Marshal.AllocHGlobal(bufferSize * sizeof(char));
         try
@@ -283,6 +323,8 @@ public sealed partial class IniFile
     /// </exception>
     public string[] GetAllSections(int bufferSize = MaxSectionBufferSize)
     {
+        ValidateBufferSize(bufferSize);
+
         nint pMem = Marshal.AllocHGlobal(bufferSize * sizeof(char));
         try
         {
@@ -313,7 +355,7 @@ public sealed partial class IniFile
     /// Deletes the specified key (and its value) from the given section of the INI file.
     /// </summary>
     /// <param name="key">The key name to delete.</param>
-    /// <param name="section">The section containing the key.</param>
+    /// <param name="section">The section containing the key, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <returns><c>true</c> if the operation succeeded; otherwise <c>false</c>.</returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
@@ -321,30 +363,32 @@ public sealed partial class IniFile
     public bool DeleteKey(string key, string? section = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return NativeWritePrivateProfileString(section, key, null, _filePath);
+        return NativeWritePrivateProfileString(NormalizeSection(section), key, null, _filePath);
     }
 
     /// <summary>
     /// Deletes the specified section and all of its keys from the INI file.
     /// </summary>
-    /// <param name="section">The section name to delete.</param>
+    /// <param name="section">The section name to delete, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <returns><c>true</c> if the operation succeeded; otherwise <c>false</c>.</returns>
     public bool DeleteSection(string? section = null)
-        => NativeWritePrivateProfileString(section, null, null, _filePath);
+        => NativeWritePrivateProfileString(NormalizeSection(section), null, null, _filePath);
 
     /// <summary>
     /// Checks whether the specified key exists in the given section of the INI file.
     /// </summary>
     /// <param name="key">The key name to check.</param>
-    /// <param name="section">The section containing the key.</param>
+    /// <param name="section">The section containing the key, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <returns>
     /// <c>true</c> if the key exists (even if its value is empty); otherwise <c>false</c>.
     /// </returns>
     public bool KeyExists(string key, string? section = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
         char[] buffer = new char[MaxSectionBufferSize];
         // Passing null for lpKeyName returns all key names in the section separated by \0.
-        int length = NativeGetPrivateProfileString(section, null, null, buffer, MaxSectionBufferSize, _filePath);
+        int length = NativeGetPrivateProfileString(NormalizeSection(section), null, null, buffer, MaxSectionBufferSize, _filePath);
         if (length <= 0) return false;
 
         string raw = new string(buffer, 0, length);

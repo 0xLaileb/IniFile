@@ -66,6 +66,27 @@ public sealed class IniFileTests : IDisposable
     }
 
     [Fact]
+    public void Write_WithoutSection_RoundTripsThroughDefaultSection()
+    {
+        // Act
+        bool ok = _ini.Write("Key", "Value");
+
+        // Assert
+        Assert.True(ok);
+        Assert.Equal("Value", _ini.ReadString("Key"));
+        Assert.True(_ini.KeyExists("Key"));
+        Assert.Contains("[]", File.ReadAllText(_testFilePath));
+    }
+
+    [Fact]
+    public void Write_NullOrEmptyKey_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.Write(null!, "Value"));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.Write("", "Value"));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.Write("   ", "Value"));
+    }
+
+    [Fact]
     public void Write_MultipleSections_StoresIndependently()
     {
         // Arrange
@@ -114,6 +135,23 @@ public sealed class IniFileTests : IDisposable
         Assert.Equal(string.Empty, result);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(32769)]
+    public void ReadString_InvalidBufferSize_ThrowsArgumentOutOfRangeException(int bufferSize)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ini.ReadString("Key", "Section", bufferSize: bufferSize));
+    }
+
+    [Fact]
+    public void ReadString_NullKey_WithSmallBuffer_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => _ini.ReadString(null, "Section", bufferSize: 2));
+    }
+
     [Fact]
     public void ReadInt_ValidInteger_ReturnsValue()
     {
@@ -135,6 +173,14 @@ public sealed class IniFileTests : IDisposable
 
         // Assert
         Assert.Equal(42, result);
+    }
+
+    [Fact]
+    public void ReadInt_NullOrEmptyKey_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadInt(null!));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadInt(""));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadInt("   "));
     }
 
     [Fact]
@@ -198,6 +244,14 @@ public sealed class IniFileTests : IDisposable
     }
 
     [Fact]
+    public void ReadBool_NullOrEmptyKey_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadBool(null!));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadBool(""));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.ReadBool("   "));
+    }
+
+    [Fact]
     public void GetAllSections_MultipleSections_ReturnsAll()
     {
         // Arrange
@@ -223,6 +277,15 @@ public sealed class IniFileTests : IDisposable
 
         // Assert
         Assert.Empty(sections);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(32769)]
+    public void GetAllSections_InvalidBufferSize_ThrowsArgumentOutOfRangeException(int bufferSize)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => _ini.GetAllSections(bufferSize));
     }
 
     [Fact]
@@ -253,6 +316,15 @@ public sealed class IniFileTests : IDisposable
         Assert.Empty(pairs);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(32769)]
+    public void GetAllDataSection_InvalidBufferSize_ThrowsArgumentOutOfRangeException(int bufferSize)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => _ini.GetAllDataSection("Section", bufferSize));
+    }
+
     [Fact]
     public void DeleteKey_RemovesKeyFromSection()
     {
@@ -278,6 +350,20 @@ public sealed class IniFileTests : IDisposable
 
         // Assert
         Assert.True(ok);
+    }
+
+    [Fact]
+    public void DeleteKey_WithoutSection_RemovesKeyFromDefaultSection()
+    {
+        // Arrange
+        _ini.Write("Key", "Val");
+
+        // Act
+        bool ok = _ini.DeleteKey("Key");
+
+        // Assert
+        Assert.True(ok);
+        Assert.False(_ini.KeyExists("Key"));
     }
 
     [Fact]
@@ -311,6 +397,20 @@ public sealed class IniFileTests : IDisposable
     }
 
     [Fact]
+    public void DeleteSection_WithoutSection_RemovesDefaultSection()
+    {
+        // Arrange
+        _ini.Write("K", "V");
+
+        // Act
+        bool ok = _ini.DeleteSection();
+
+        // Assert
+        Assert.True(ok);
+        Assert.False(_ini.KeyExists("K"));
+    }
+
+    [Fact]
     public void KeyExists_ExistingKey_ReturnsTrue()
     {
         // Arrange
@@ -325,6 +425,14 @@ public sealed class IniFileTests : IDisposable
     {
         // Act & Assert
         Assert.False(_ini.KeyExists("Ghost", "NoSection"));
+    }
+
+    [Fact]
+    public void KeyExists_NullOrEmptyKey_ThrowsArgumentException()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => _ini.KeyExists(null!));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.KeyExists(""));
+        Assert.ThrowsAny<ArgumentException>(() => _ini.KeyExists("   "));
     }
 
     [Fact]
@@ -406,6 +514,8 @@ public sealed class IniFileTests : IDisposable
     [InlineData(1023)]
     [InlineData(1024)]
     [InlineData(1025)]
+    [InlineData(32766)]
+    [InlineData(32767)]
     public void ReadString_ValueAtBufferBoundary_ReturnsFullValue(int length)
     {
         // Arrange
@@ -476,20 +586,19 @@ public sealed class IniFileTests : IDisposable
     }
 
     [Fact]
-    public void ReadString_NullSection_ReturnsAllSectionNames()
+    public void ReadString_NullKey_ReturnsKeyNamesForSection()
     {
-        // Arrange: create two sections
-        _ini.Write("K", "V", "Alpha");
-        _ini.Write("K", "V", "Beta");
+        // Arrange
+        _ini.Write("First", "1", "Alpha");
+        _ini.Write("Second", "2", "Alpha");
 
-        // Act: passing null for both key and section returns all section names
-        // as a single null-separated string (undocumented but consistent Windows API behavior)
-        string[] sections = _ini.GetAllSections();
+        // Act
+        string keyNames = _ini.ReadString(null, "Alpha");
+        string[] keys = keyNames.Split('\0', StringSplitOptions.RemoveEmptyEntries);
 
-        // Assert via GetAllSections (already tested), just confirm ReadString with
-        // null key returns something non-empty when sections exist
-        string keyNames = _ini.ReadString(null!, "Alpha");
-        Assert.False(string.IsNullOrEmpty(keyNames));
+        // Assert
+        Assert.Contains("First", keys);
+        Assert.Contains("Second", keys);
     }
 
     [Fact]
