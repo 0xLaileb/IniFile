@@ -79,7 +79,7 @@ Install-Package Laileb.IniFile
 Or add directly to your `.csproj`:
 
 ```xml
-<PackageReference Include="Laileb.IniFile" Version="2.0.3" />
+<PackageReference Include="Laileb.IniFile" Version="2.0.4" />
 ```
 
 > 💡 Make sure to enable `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` in your `.csproj` (required by `LibraryImport` source generation).
