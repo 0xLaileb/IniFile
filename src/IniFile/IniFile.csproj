@@ -21,7 +21,7 @@
     <PackageProjectUrl>https://github.com/0xLaileb/IniFile</PackageProjectUrl>
     <RepositoryUrl>https://github.com/0xLaileb/IniFile</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>https://github.com/0xLaileb/IniFile/releases/tag/v2.0.3</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/0xLaileb/IniFile/releases/tag/v2.0.5</PackageReleaseNotes>
 
     <!-- Icon &amp; README (embedded in .nupkg) -->
     <PackageIcon>icon.png</PackageIcon>
