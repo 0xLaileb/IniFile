@@ -611,16 +611,15 @@ public sealed class IniFileTests : IDisposable
         Assert.ThrowsAny<ArgumentException>(() => _ini.DeleteKey("   "));
     }
 
-    [Fact]
-    public void GetAllDataSection_NullSection_ThrowsArgumentException()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void GetAllDataSection_NullOrEmptySection_ReturnsEmptySectionEntries(string? section)
     {
-        Assert.ThrowsAny<ArgumentException>(() => _ini.GetAllDataSection(null!));
-    }
+        _ini.Write("Root", "1");
+        _ini.Write("K", "V", "Named");
 
-    [Fact]
-    public void GetAllDataSection_EmptySection_ThrowsArgumentException()
-    {
-        Assert.ThrowsAny<ArgumentException>(() => _ini.GetAllDataSection(""));
+        Assert.Equal(["Root=1"], _ini.GetAllDataSection(section));
     }
 
     [Fact]
@@ -748,6 +747,59 @@ public sealed class IniFileTests : IDisposable
         Assert.Equal((byte)'[', bytes[0]);
         Assert.Equal("1", _ini.ReadString("Old", "Section"));
         Assert.Equal("2", _ini.ReadString("New", "Section"));
+    }
+
+    [Theory]
+    [InlineData("  spaced  ", "spaced")]
+    [InlineData("\"quoted\"", "quoted")]
+    [InlineData("'single'", "single")]
+    public void ReadString_WrappedValue_ReturnsNormalizedValue(string stored, string expected)
+    {
+        _ini.Write("Key", stored, "Section");
+
+        Assert.Equal(expected, _ini.ReadString("Key", "Section"));
+    }
+
+    [Fact]
+    public void ReadString_MissingKeyWithPaddedDefault_ReturnsDefaultWithoutTrailingWhitespace()
+    {
+        Assert.Equal("  fallback", _ini.ReadString("Missing", "Section", defaultValue: "  fallback  "));
+    }
+
+    [Theory]
+    [InlineData("12abc", 12)]
+    [InlineData("", -1)]
+    public void ReadInt_PartialOrEmptyValue_FollowsNativeParsing(string stored, int expected)
+    {
+        _ini.Write("Key", stored, "Section");
+
+        Assert.Equal(expected, _ini.ReadInt("Key", "Section", defaultValue: -1));
+    }
+
+    [Fact]
+    public void GetAllSections_EmptySectionPresent_ExcludesEmptySection()
+    {
+        _ini.Write("Root", "1");
+        _ini.Write("K", "V", "Named");
+
+        Assert.Equal(["Named"], _ini.GetAllSections());
+    }
+
+    [Fact]
+    public void GetAllDataSection_CommentAndBareLines_SkipsCommentsOnly()
+    {
+        File.WriteAllText(_testFilePath, "[S]\r\n; comment\r\nBare\r\nK = V\r\n");
+
+        Assert.Equal(["Bare", "K=V"], _ini.GetAllDataSection("S"));
+    }
+
+    [Fact]
+    public void DeleteKey_MissingKey_ReturnsTrue()
+    {
+        _ini.Write("Other", "1", "Section");
+
+        Assert.True(_ini.DeleteKey("Missing", "Section"));
+        Assert.True(_ini.DeleteSection("MissingSection"));
     }
 
     [Fact]

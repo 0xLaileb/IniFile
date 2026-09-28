@@ -20,7 +20,10 @@ using System.Runtime.Versioning;
 /// order mark (ANSI, UTF-8) in the system ANSI code page, replacing other characters with <c>?</c>,
 /// and does not recognize the first section of a UTF-8 file with a byte order mark.
 /// <para/>
-/// Values longer than 32,767 characters are truncated on read.
+/// Values: on read, Windows trims whitespace around values, removes one pair of surrounding
+/// double or single quotes, and truncates values longer than 32,767 characters.
+/// <para/>
+/// Writes from several threads of one process are serialized.
 /// <para/>
 /// Source: <see href="https://github.com/0xLaileb/IniFile"/>
 /// </remarks>
@@ -31,8 +34,7 @@ public sealed partial class IniFile
     private const int DefaultBufferSize = 1024;
 
     /// <summary>
-    /// Maximum buffer size (in characters) used for section enumeration.
-    /// Matches the Windows API maximum for INI files (32,768 characters).
+    /// Maximum buffer size (in characters) for value reads and list reads.
     /// </summary>
     private const int MaxSectionBufferSize = 32768;
 
@@ -276,21 +278,23 @@ public sealed partial class IniFile
     /// </param>
     /// <param name="defaultValue">
     /// The value returned when the key is not found. Defaults to an empty string.
+    /// Windows trims its trailing whitespace.
     /// </param>
     /// <param name="bufferSize">
-    /// The initial size of the internal read buffer in characters. Defaults to <see cref="DefaultBufferSize"/>.
-    /// The buffer doubles automatically if the value exceeds it, up to <see cref="MaxSectionBufferSize"/>.
+    /// The initial size of the internal read buffer in characters, from 2 to 32768. Defaults to 1024.
+    /// The buffer doubles automatically if the value exceeds it, up to 32768.
     /// For native key/section enumeration, the buffer must be at least 3 characters.
     /// </param>
     /// <returns>
     /// The value associated with the key, or <paramref name="defaultValue"/> if the key was not found.
-    /// Values longer than 32,767 characters are truncated.
+    /// Windows trims whitespace around the value, removes one pair of surrounding double or single
+    /// quotes, and truncates values longer than 32,767 characters.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="bufferSize"/> is outside the supported range.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when enumerated names (<paramref name="key"/> is <c>null</c>) exceed 32,768 characters.
+    /// Thrown when enumerated names (<paramref name="key"/> is <c>null</c>) do not fit into 32,768 characters.
     /// </exception>
     public string ReadString(string? key, string? section = null,
         string defaultValue = "", int bufferSize = DefaultBufferSize)
@@ -328,12 +332,14 @@ public sealed partial class IniFile
     /// <param name="key">The key name.</param>
     /// <param name="section">The section name, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <param name="defaultValue">
-    /// The value returned when the key is not found. Defaults to <c>-1</c>.
+    /// The value returned when the key is missing or its value is empty. Defaults to <c>-1</c>.
     /// </param>
     /// <returns>
-    /// The integer value of the key, or <paramref name="defaultValue"/> if the key was not found.
-    /// Malformed numeric values follow the native <c>GetPrivateProfileInt</c> parsing behavior
-    /// and may return <c>0</c> instead of <paramref name="defaultValue"/>.
+    /// The integer value of the key, or <paramref name="defaultValue"/> if the key is missing or empty.
+    /// Parsing follows the native <c>GetPrivateProfileInt</c>: decimal and <c>0x</c> hexadecimal values
+    /// are supported, only the leading number is used (<c>"12abc"</c> gives <c>12</c>), a value that
+    /// does not start with a number gives <c>0</c>, and values outside the <see cref="int"/> range
+    /// overflow without an error.
     /// </returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
@@ -357,6 +363,9 @@ public sealed partial class IniFile
     /// <c>false</c> for <c>"false"</c>, <c>"0"</c>, or <c>"no"</c> (case-insensitive);
     /// otherwise <paramref name="defaultValue"/>.
     /// </returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
+    /// </exception>
     public bool ReadBool(string key, string? section = null, bool defaultValue = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -378,42 +387,40 @@ public sealed partial class IniFile
     /// <summary>
     /// Retrieves all key/value pairs for the specified section of the INI file.
     /// </summary>
-    /// <param name="section">The section name.</param>
+    /// <param name="section">The section name, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <param name="bufferSize">
-    /// The size of the internal read buffer in characters, from 3 to 32768.
-    /// Defaults to <see cref="MaxSectionBufferSize"/>.
+    /// The size of the internal read buffer in characters, from 3 to 32768. Defaults to 32768.
     /// </param>
     /// <returns>
     /// An array of strings in <c>"key=value"</c> format for each entry in the section.
+    /// Comment lines are skipped; lines without <c>=</c> are returned as they are.
     /// Returns an empty array if the section does not exist or contains no keys.
     /// </returns>
-    /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="section"/> is <c>null</c>, empty, or whitespace.
-    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="bufferSize"/> is outside the supported range.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the section data does not fit into <paramref name="bufferSize"/> characters.
     /// </exception>
-    public string[] GetAllDataSection(string section, int bufferSize = MaxSectionBufferSize)
+    public string[] GetAllDataSection(string? section = null, int bufferSize = MaxSectionBufferSize)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(section);
+        string nativeSection = NormalizeSection(section);
         return ReadList(
             bufferSize,
-            (buffer, size) => NativeGetPrivateProfileSection(section, buffer, size, _filePath),
-            $"Section '{section}' data");
+            (buffer, size) => NativeGetPrivateProfileSection(nativeSection, buffer, size, _filePath),
+            $"Section '{nativeSection}' data");
     }
 
     /// <summary>
     /// Retrieves the names of all sections in the INI file.
     /// </summary>
     /// <param name="bufferSize">
-    /// The size of the internal read buffer in characters, from 3 to 32768.
-    /// Defaults to <see cref="MaxSectionBufferSize"/>.
+    /// The size of the internal read buffer in characters, from 3 to 32768. Defaults to 32768.
     /// </param>
     /// <returns>
-    /// An array of section names. Returns an empty array if the file has no sections.
+    /// An array of section names, without the empty <c>[]</c> section
+    /// (read its entries with <see cref="GetAllDataSection"/> and a <c>null</c> section).
+    /// Returns an empty array if the file has no sections.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="bufferSize"/> is outside the supported range.
@@ -429,12 +436,14 @@ public sealed partial class IniFile
 
     /// <summary>
     /// Deletes the specified key (and its value) from the given section of the INI file.
+    /// Like <see cref="Write"/>, creates a missing file.
     /// </summary>
     /// <param name="key">The key name to delete.</param>
     /// <param name="section">The section containing the key, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <returns>
-    /// <c>true</c> if the operation succeeded; otherwise <c>false</c>. On failure, call
-    /// <see cref="Marshal.GetLastPInvokeError"/> immediately to get the Win32 error code.
+    /// <c>true</c> if the operation succeeded, including when there was nothing to delete;
+    /// otherwise <c>false</c>. On failure, call <see cref="Marshal.GetLastPInvokeError"/>
+    /// immediately to get the Win32 error code.
     /// </returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="key"/> is <c>null</c>, empty, or whitespace.
@@ -447,11 +456,13 @@ public sealed partial class IniFile
 
     /// <summary>
     /// Deletes the specified section and all of its keys from the INI file.
+    /// Like <see cref="Write"/>, creates a missing file.
     /// </summary>
     /// <param name="section">The section name to delete, or <c>null</c> for the empty section name serialized as <c>[]</c>.</param>
     /// <returns>
-    /// <c>true</c> if the operation succeeded; otherwise <c>false</c>. On failure, call
-    /// <see cref="Marshal.GetLastPInvokeError"/> immediately to get the Win32 error code.
+    /// <c>true</c> if the operation succeeded, including when there was nothing to delete;
+    /// otherwise <c>false</c>. On failure, call <see cref="Marshal.GetLastPInvokeError"/>
+    /// immediately to get the Win32 error code.
     /// </returns>
     public bool DeleteSection(string? section = null)
         => WriteProfileString(NormalizeSection(section), null, null);
