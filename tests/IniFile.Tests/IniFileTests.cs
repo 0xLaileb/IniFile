@@ -282,6 +282,7 @@ public sealed class IniFileTests : IDisposable
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
+    [InlineData(2)]
     [InlineData(32769)]
     public void GetAllSections_InvalidBufferSize_ThrowsArgumentOutOfRangeException(int bufferSize)
     {
@@ -319,6 +320,7 @@ public sealed class IniFileTests : IDisposable
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
+    [InlineData(2)]
     [InlineData(32769)]
     public void GetAllDataSection_InvalidBufferSize_ThrowsArgumentOutOfRangeException(int bufferSize)
     {
@@ -619,5 +621,257 @@ public sealed class IniFileTests : IDisposable
     public void GetAllDataSection_EmptySection_ThrowsArgumentException()
     {
         Assert.ThrowsAny<ArgumentException>(() => _ini.GetAllDataSection(""));
+    }
+
+    [Fact]
+    public void GetAllDataSection_BufferTooSmall_ThrowsInvalidOperationException()
+    {
+        _ini.Write("Host", "localhost", "DB");
+
+        Assert.Throws<InvalidOperationException>(() => _ini.GetAllDataSection("DB", bufferSize: 3));
+    }
+
+    [Fact]
+    public void GetAllSections_BufferTooSmall_ThrowsInvalidOperationException()
+    {
+        _ini.Write("K", "V", "Alpha");
+
+        Assert.Throws<InvalidOperationException>(() => _ini.GetAllSections(bufferSize: 3));
+    }
+
+    [Fact]
+    public void GetAllSections_MinimumBufferOnEmptyFile_ReturnsEmptyArray()
+    {
+        Assert.Empty(_ini.GetAllSections(bufferSize: 3));
+    }
+
+    [Fact]
+    public void ReadString_NullKeyAndSection_ReturnsSectionNames()
+    {
+        _ini.Write("K", "V", "Alpha");
+        _ini.Write("K", "V", "Beta");
+
+        string[] sections = _ini.ReadString(null).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(["Alpha", "Beta"], sections);
+    }
+
+    [Fact]
+    public void ReadString_NullKeyWithKeyNamesOverMaxBuffer_ThrowsInvalidOperationException()
+    {
+        WriteSectionWithManyKeys("Huge", keyCount: 2000);
+
+        Assert.Throws<InvalidOperationException>(() => _ini.ReadString(null, "Huge"));
+    }
+
+    [Fact]
+    public void KeyExists_KeyNamesExceedMaxBuffer_ReturnsTrue()
+    {
+        WriteSectionWithManyKeys("Huge", keyCount: 2000);
+
+        Assert.True(_ini.KeyExists(ManyKeysKeyName(1999), "Huge"));
+        Assert.False(_ini.KeyExists("Missing", "Huge"));
+    }
+
+    [Fact]
+    public void KeyExists_DifferentCase_ReturnsTrue()
+    {
+        _ini.Write("Language", "CSharp", "Prefs");
+
+        Assert.True(_ini.KeyExists("LANGUAGE", "prefs"));
+    }
+
+    [Fact]
+    public void KeyExists_KeyFoundByReadString_ReturnsTrue()
+    {
+        // Windows trims key names, so ReadString finds " Padded " and KeyExists must agree.
+        _ini.Write("Padded", "Value", "Section");
+
+        Assert.Equal("Value", _ini.ReadString(" Padded ", "Section"));
+        Assert.True(_ini.KeyExists(" Padded ", "Section"));
+    }
+
+    [Theory]
+    [InlineData("\u0001")]
+    [InlineData("\u0002")]
+    public void KeyExists_ValueEqualsInternalProbe_ReturnsTrue(string value)
+    {
+        _ini.Write("Key", value, "Section");
+
+        Assert.True(_ini.KeyExists("Key", "Section"));
+    }
+
+    [Fact]
+    public void Write_UnicodeValueToUtf16File_RoundTrips()
+    {
+        // Windows keeps Unicode text only when the file already exists as UTF-16 LE with a BOM.
+        const string value = "Привет 你好 😀";
+        File.WriteAllText(_testFilePath, string.Empty, new System.Text.UnicodeEncoding(false, true));
+
+        _ini.Write("Greeting", value, "Section");
+
+        Assert.Equal(value, _ini.ReadString("Greeting", "Section"));
+    }
+
+    [Fact]
+    public void Write_NewFile_CreatesUtf16LeFileWithByteOrderMark()
+    {
+        _ini.Write("Key", "Value", "Section");
+
+        byte[] bytes = File.ReadAllBytes(_testFilePath);
+        Assert.True(bytes.Length > 2);
+        Assert.Equal([0xFF, 0xFE], bytes[..2]);
+        Assert.Equal("Value", _ini.ReadString("Key", "Section"));
+    }
+
+    [Theory]
+    [InlineData("Привет")]
+    [InlineData("你好")]
+    [InlineData("😀")]
+    [InlineData("Ünïcödé ✓")]
+    public void Write_UnicodeValueToNewFile_RoundTrips(string value)
+    {
+        _ini.Write("Ключ", value, "Раздел");
+
+        Assert.Equal(value, _ini.ReadString("Ключ", "Раздел"));
+        Assert.Contains($"Ключ={value}", File.ReadAllText(_testFilePath));
+    }
+
+    [Fact]
+    public void Write_ExistingFileWithoutByteOrderMark_KeepsEncoding()
+    {
+        File.WriteAllText(_testFilePath, "[Section]\r\nOld=1\r\n", new System.Text.UTF8Encoding(false));
+
+        _ini.Write("New", "2", "Section");
+
+        byte[] bytes = File.ReadAllBytes(_testFilePath);
+        Assert.Equal((byte)'[', bytes[0]);
+        Assert.Equal("1", _ini.ReadString("Old", "Section"));
+        Assert.Equal("2", _ini.ReadString("New", "Section"));
+    }
+
+    [Fact]
+    public void Write_ConcurrentFirstWritesToNewFile_AllSucceed()
+    {
+        const int iterations = 40;
+        const int writers = 8;
+
+        for (int iteration = 0; iteration < iterations; iteration++)
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"IniFileTest_{Guid.NewGuid():N}.ini");
+            try
+            {
+                var ini = new IniFileLib(path);
+                using var start = new Barrier(writers);
+                bool[] results = new bool[writers];
+
+                Thread[] threads = Enumerable.Range(0, writers)
+                    .Select(i => new Thread(() =>
+                    {
+                        start.SignalAndWait();
+                        results[i] = ini.Write($"Key{i}", $"Значение {i}", "Section");
+                    }))
+                    .ToArray();
+                Array.ForEach(threads, t => t.Start());
+                Array.ForEach(threads, t => t.Join());
+
+                Assert.All(results, Assert.True);
+                for (int i = 0; i < writers; i++)
+                {
+                    Assert.Equal($"Значение {i}", ini.ReadString($"Key{i}", "Section"));
+                }
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void Write_NulDevice_DoesNotThrow()
+    {
+        var ini = new IniFileLib("NUL");
+
+        Exception? exception = Record.Exception(() => ini.Write("Key", "Value", "Section"));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void Write_EmptyExistingFile_AddsByteOrderMark()
+    {
+        File.WriteAllBytes(_testFilePath, []);
+
+        _ini.Write("Greeting", "你好", "Section");
+
+        Assert.Equal([0xFF, 0xFE], File.ReadAllBytes(_testFilePath)[..2]);
+        Assert.Equal("你好", _ini.ReadString("Greeting", "Section"));
+    }
+
+    [Fact]
+    public void DeleteKey_MissingFile_LaterUnicodeWriteRoundTrips()
+    {
+        // Windows creates the file even when deleting from a missing one; it must still accept Unicode.
+        _ini.DeleteKey("Key", "Section");
+        _ini.Write("Greeting", "你好", "Section");
+
+        Assert.Equal("你好", _ini.ReadString("Greeting", "Section"));
+    }
+
+    [Fact]
+    public void DeleteSection_MissingFile_LaterUnicodeWriteRoundTrips()
+    {
+        _ini.DeleteSection("Section");
+        _ini.Write("Greeting", "你好", "Section");
+
+        Assert.Equal("你好", _ini.ReadString("Greeting", "Section"));
+    }
+
+    [Fact]
+    public void KeyExists_LongValue_ReturnsTrue()
+    {
+        _ini.Write("Long", new string('X', 5000), "Section");
+
+        Assert.True(_ini.KeyExists("Long", "Section"));
+    }
+
+    [Theory]
+    [InlineData("\u0001x")]
+    [InlineData("\u0002x")]
+    public void KeyExists_ValueStartsWithInternalProbe_ReturnsTrue(string value)
+    {
+        _ini.Write("Key", value, "Section");
+
+        Assert.True(_ini.KeyExists("Key", "Section"));
+    }
+
+    [Fact]
+    public void Write_DirectoryDoesNotExist_ReturnsFalseWithPathNotFoundError()
+    {
+        const int errorPathNotFound = 3;
+        string missingDirectory = Path.Combine(Path.GetTempPath(), $"IniFileTest_{Guid.NewGuid():N}");
+        var ini = new IniFileLib(Path.Combine(missingDirectory, "config.ini"));
+
+        bool ok = ini.Write("Key", "Value", "Section");
+        int error = System.Runtime.InteropServices.Marshal.GetLastPInvokeError();
+
+        Assert.False(ok);
+        Assert.Equal(errorPathNotFound, error);
+        Assert.False(Directory.Exists(missingDirectory));
+    }
+
+    private static string ManyKeysKeyName(int index) => $"key_{index:D5}_with_a_long_name";
+
+    /// <summary>Writes a section whose key names alone exceed the 32,768-character native limit.</summary>
+    private void WriteSectionWithManyKeys(string section, int keyCount)
+    {
+        var content = new System.Text.StringBuilder($"[{section}]\r\n");
+        for (int i = 0; i < keyCount; i++)
+        {
+            content.Append(ManyKeysKeyName(i)).Append("=1\r\n");
+        }
+
+        File.WriteAllText(_testFilePath, content.ToString());
     }
 }

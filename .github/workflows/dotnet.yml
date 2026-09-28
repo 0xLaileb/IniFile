@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: ["master"]
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -35,6 +38,10 @@ jobs:
 
       - name: Test
         run: dotnet test IniFile.slnx --no-build --configuration Release --verbosity normal
+
+      # Runs package validation against the published baseline, so public API breaks fail PRs too
+      - name: Validate package
+        run: dotnet pack src/IniFile/IniFile.csproj --no-build --configuration Release --output ./nupkg-validation
 
   # ─────────────────────────────────────────────
   # Job 2: Pack (runs on master push AND on tags)
@@ -114,6 +121,8 @@ jobs:
 
       - name: Push to NuGet.org
         shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           $pkg = Get-ChildItem ./nupkg/*.nupkg | Select-Object -First 1
-          dotnet nuget push $pkg.FullName --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push $pkg.FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate

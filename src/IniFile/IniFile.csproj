@@ -7,9 +7,9 @@
 
     <!-- Package Identity -->
     <PackageId>Laileb.IniFile</PackageId>
-    <Version>2.0.4</Version>
-    <AssemblyVersion>2.0.4.0</AssemblyVersion>
-    <FileVersion>2.0.4.0</FileVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
 
     <!-- Description -->
     <Title>IniFile — Windows INI File Wrapper</Title>
@@ -21,7 +21,7 @@
     <PackageProjectUrl>https://github.com/0xLaileb/IniFile</PackageProjectUrl>
     <RepositoryUrl>https://github.com/0xLaileb/IniFile</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>https://github.com/0xLaileb/IniFile/releases/tag/v2.0.4</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/0xLaileb/IniFile/releases/tag/2.1.0</PackageReleaseNotes>
 
     <!-- Icon &amp; README (embedded in .nupkg) -->
     <PackageIcon>icon.png</PackageIcon>
@@ -34,23 +34,20 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-    <!-- SourceLink -->
+    <!-- SourceLink (built into the .NET 8+ SDK, no package reference needed) -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
 
-    <!-- Catches accidental public API removals between versions -->
+    <!-- Catches accidental public API removals: the package is compared with the published baseline
+         (downloaded from NuGet during pack). Raise the baseline only for intentional breaking releases. -->
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>2.0.4</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <!-- Embed icon and README inside the .nupkg -->
   <ItemGroup>
     <None Include="..\..\resources\icon.png" Pack="true" PackagePath="icon.png" />
     <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
-  </ItemGroup>
-
-  <!-- SourceLink (build-time only, not a consumer dependency) -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>

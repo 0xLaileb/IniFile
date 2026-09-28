@@ -20,6 +20,7 @@
   - [📌 Prerequisites](#-prerequisites)
   - [📦 Installation](#-installation)
 - [💡 Usage](#-usage)
+- [⚠️ Limitations](#️-limitations)
 - [📚 API Reference](#-api-reference)
 - [🧪 Running Tests](#-running-tests)
 - [🏗️ Project Structure](#️-project-structure)
@@ -32,7 +33,7 @@
 
 **IniFile** is a thin, zero-dependency wrapper around the Windows `kernel32.dll` Private Profile functions (`WritePrivateProfileString`, `GetPrivateProfileString`, `GetPrivateProfileInt`, etc.).
 
-It lets you read and write classic **INI configuration files** with a simple, strongly-typed C# API — no parsing logic needed.
+It lets you read and write classic **INI configuration files** with a simple, strongly-typed C# API — no parsing logic needed. New files are created as UTF-16, so any Unicode text is preserved.
 
 > ⚠️ **Note:** This library uses Windows-only P/Invoke calls and is **not cross-platform**.
 
@@ -59,8 +60,7 @@ It lets you read and write classic **INI configuration files** with a simple, st
 ### 📌 Prerequisites
 
 - **OS:** Windows 10 / 11 or Windows Server 2016+
-- **SDK:** [.NET 10 SDK](https://dotnet.microsoft.com/download) or later
-- **Language:** C# 14
+- **Target framework:** `net10.0` or later ([.NET 10 SDK](https://dotnet.microsoft.com/download))
 
 ### 📦 Installation
 
@@ -79,10 +79,10 @@ Install-Package Laileb.IniFile
 Or add directly to your `.csproj`:
 
 ```xml
-<PackageReference Include="Laileb.IniFile" Version="2.0.4" />
+<PackageReference Include="Laileb.IniFile" Version="2.1.0" />
 ```
 
-> 💡 Make sure to enable `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` in your `.csproj` (required by `LibraryImport` source generation).
+> 💡 No extra project settings are needed: the P/Invoke marshalling code is generated inside the library itself.
 
 ---
 
@@ -114,7 +114,23 @@ ini.DeleteKey("Host", "Database");
 ini.DeleteSection("Logging");
 ```
 
-👉 See the full working demo in [`examples/IniFile.Example/Program.cs`](https://github.com/0xLaileb/IniFile/blob/master/examples/IniFile.Example/Program.cs).
+👉 See the full working demo in [`examples/IniFile.Example/Program.cs`](https://github.com/0xLaileb/IniFile/blob/master/examples/IniFile.Example/Program.cs). Run it from the repository root:
+
+```bash
+dotnet run --project examples/IniFile.Example
+```
+
+---
+
+## ⚠️ Limitations
+
+These come from the underlying Windows API:
+
+- **Encoding.** New (missing or empty) files are created as **UTF-16 LE with a byte order mark**, so any Unicode text (Cyrillic, CJK, emoji) round-trips. This is the only Unicode encoding the Windows profile API supports: it does not understand UTF-8. Files that already have content keep their encoding; in files without the UTF-16 LE byte order mark (ANSI or UTF-8), Windows stores text in the system ANSI code page and replaces other characters with `?`, and in a UTF-8 file with a byte order mark it does not recognize the first section. To make such a file Unicode-capable, re-save it as UTF-16 LE with a byte order mark; for a UTF-8 file: `File.WriteAllText(path, File.ReadAllText(path), Encoding.Unicode)`. If you need an ANSI file for a legacy tool, create it yourself before the first write.
+
+- **Size.** Values longer than 32,767 characters are truncated on read. Listing keys, sections, or section entries throws `InvalidOperationException` when the data exceeds 32,768 characters.
+- **Errors.** `Write`, `DeleteKey`, and `DeleteSection` return `false` instead of throwing. Call `Marshal.GetLastPInvokeError()` right after a failed call to get the Win32 error code (for example, `3` when the directory does not exist).
+- **Case.** Windows matches section and key names ignoring ASCII letter case; case-insensitive matching of non-ASCII letters (for example, Cyrillic) is not guaranteed.
 
 ---
 
@@ -140,13 +156,15 @@ Creates a new instance bound to the given file path. The path is resolved to an 
 ```csharp
 public bool Write(string key, string? value, string? section = null)
 ```
-Writes a string value. Returns `true` on success. Creates the file, section, and key if they don't exist. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
+Writes a string value. Returns `true` on success, `false` on failure (see [Limitations](#️-limitations) for error codes). Creates the file (as UTF-16 LE, see [Limitations](#️-limitations)), section, and key if they don't exist; the directory must already exist. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### 📖 `ReadString`
 ```csharp
 public string ReadString(string? key, string? section = null, string defaultValue = "", int bufferSize = 1024)
 ```
-Returns the value for the key, or `defaultValue` if not found. When `section` is omitted or `null`, key reads use an empty section name, which Windows serializes as `[]`. Passing `null` for `key` preserves the native enumeration behavior: key names for a section, or section names when both `key` and `section` are `null`.
+Returns the value for the key, or `defaultValue` if not found. When `section` is omitted or `null`, key reads use an empty section name, which Windows serializes as `[]`. Passing `null` for `key` preserves the native enumeration behavior: key names for a section, or section names when both `key` and `section` are `null`, returned as one `\0`-separated string.
+
+`bufferSize` is the initial buffer (2 to 32768 characters, at least 3 for enumeration); it doubles automatically when a value does not fit.
 
 #### 🔢 `ReadInt`
 ```csharp
@@ -164,13 +182,13 @@ Returns `true` for `"true"`, `"1"`, `"yes"`; `false` for `"false"`, `"0"`, `"no"
 ```csharp
 public string[] GetAllSections(int bufferSize = 32768)
 ```
-Returns an array of all section names. Returns an empty array if the file has no sections.
+Returns an array of all section names. Returns an empty array if the file has no sections. `bufferSize` must be from 3 to 32768; `InvalidOperationException` is thrown when the names do not fit.
 
 #### 📋 `GetAllDataSection`
 ```csharp
 public string[] GetAllDataSection(string section, int bufferSize = 32768)
 ```
-Returns an array of `"key=value"` strings for every entry in the given section.
+Returns an array of `"key=value"` strings for every entry in the given section, or an empty array if the section does not exist. `section` must not be null, empty, or whitespace. `bufferSize` must be from 3 to 32768; `InvalidOperationException` is thrown when the entries do not fit.
 
 #### 🗑️ `DeleteKey`
 ```csharp
@@ -188,7 +206,7 @@ Removes an entire section. Returns `true` on success. When `section` is omitted 
 ```csharp
 public bool KeyExists(string key, string? section = null)
 ```
-Returns `true` if the key exists in the section (including keys with empty values). When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
+Returns `true` if the key exists in the section (including keys with empty values). Keys are matched exactly as `ReadString` matches them, and the section size is not limited. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 ---
 
@@ -206,6 +224,7 @@ Tests are located in [`tests/IniFile.Tests/`](https://github.com/0xLaileb/IniFil
 
 ```
 IniFile/
+├── 📁 .github/workflows/        # CI: build, test, pack, publish to NuGet on tags
 ├── 📁 src/
 │   └── 📁 IniFile/              # Library source
 │       ├── 📄 IniFile.cs
@@ -218,9 +237,11 @@ IniFile/
 │   └── 📁 IniFile.Example/      # Console demo app
 │       ├── 📄 Program.cs
 │       └── 📄 IniFile.Example.csproj
+├── 📁 resources/                # NuGet package icon
 ├── 📄 Directory.Build.props      # Shared build settings
 ├── 📄 Directory.Packages.props   # Central package management
 ├── 📄 IniFile.slnx               # Solution file
+├── 📄 LICENSE
 └── 📄 README.md
 ```
 
