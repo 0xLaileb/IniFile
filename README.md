@@ -20,10 +20,10 @@
   - [📌 Prerequisites](#-prerequisites)
   - [📦 Installation](#-installation)
 - [💡 Usage](#-usage)
-- [⚠️ Limitations](#️-limitations)
+- [🚧 Limitations](#-limitations)
 - [📚 API Reference](#-api-reference)
 - [🧪 Running Tests](#-running-tests)
-- [🏗️ Project Structure](#️-project-structure)
+- [🧱 Project Structure](#-project-structure)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
@@ -122,7 +122,7 @@ dotnet run --project examples/IniFile.Example
 
 ---
 
-## ⚠️ Limitations
+## 🚧 Limitations
 
 These come from the underlying Windows API:
 
@@ -156,7 +156,7 @@ Creates a new instance bound to the given file path. The path is resolved to an 
 ```csharp
 public bool Write(string key, string? value, string? section = null)
 ```
-Writes a string value. Returns `true` on success, `false` on failure (see [Limitations](#️-limitations) for error codes). Creates the file (as UTF-16 LE, see [Limitations](#️-limitations)), section, and key if they don't exist; the directory must already exist. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
+Writes a string value. Returns `true` on success, `false` on failure (see [Limitations](#-limitations) for error codes). Creates the file (as UTF-16 LE, see [Limitations](#-limitations)), section, and key if they don't exist; the directory must already exist. When `section` is omitted or `null`, the wrapper uses an empty section name, which Windows serializes as `[]`.
 
 #### 📖 `ReadString`
 ```csharp
@@ -220,7 +220,7 @@ Tests are located in [`tests/IniFile.Tests/`](https://github.com/0xLaileb/IniFil
 
 ---
 
-## 🏗️ Project Structure
+## 🧱 Project Structure
 
 ```
 IniFile/
